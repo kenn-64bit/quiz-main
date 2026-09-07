@@ -124,12 +124,14 @@ export const styles = {
     fontSize: 13,
     fontWeight: 700,
     color: theme.muted,
+    textAlign: 'center',
   },
   questionText: {
     fontSize: 20,
     fontWeight: 700,
     lineHeight: 1.35,
     margin: '8px 0 28px',
+    textAlign: 'center',
   },
 
   scaleRow: {
@@ -169,10 +171,37 @@ export const styles = {
   },
   scaleHint: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     fontSize: 11,
     color: theme.muted,
     marginTop: 6,
+  },
+
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.45)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    zIndex: 50,
+  },
+  modalCard: {
+    background: theme.card,
+    color: theme.text,
+    borderRadius: 18,
+    padding: 24,
+    maxWidth: 320,
+    width: '100%',
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: 600,
+  },
+  modalActions: {
+    display: 'flex',
+    gap: 12,
+    marginTop: 20,
   },
 
   navRow: {
@@ -191,6 +220,7 @@ export const styles = {
     marginBottom: 16,
   },
   resultName: { fontSize: 22, fontWeight: 800, margin: '4px 0' },
+  resultStatement: { fontSize: 24, fontWeight: 800, lineHeight: 1.25, margin: '4px 0 8px' },
   resultDesc: { fontSize: 14, opacity: 0.92 },
   confidence: { fontSize: 13, fontWeight: 700, marginTop: 12 },
 

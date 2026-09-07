@@ -1,10 +1,11 @@
 """Tech Stack Field Recommendation Quiz — Flask expert-system backend.
 
 The quiz presents 10 first-person statements. The user rates each one on a
-1-4 scale (1 = strongly disagree, 4 = strongly agree) or picks "N/O" (no
-opinion). Each statement is mapped to a single career field with a weight;
-the rating multiplied by the weight is added to that field's score. The
-field with the highest score is the primary recommendation.
+1-5 scale (1 = strongly disagree, 3 = neutral, 5 = strongly agree). Each
+statement is mapped to a single career field with a weight; the rating
+offset from the neutral center (rating - 3) multiplied by the weight is
+added to that field's score. The field with the highest score is the
+primary recommendation.
 """
 
 from flask import Flask, jsonify, request
@@ -111,7 +112,7 @@ class ExpertSystem:
                 "id": s["id"],
                 "question": s["text"],
                 "type": "scale",
-                "scale": {"min": 1, "max": 4, "allow_no_opinion": True},
+                "scale": {"min": 1, "max": 5, "allow_no_opinion": False},
             }
             for s in self.statements
         ]
@@ -120,10 +121,10 @@ class ExpertSystem:
         scores = {fid: 0 for fid in self.fields}
 
         for statement, response in zip(self.statements, responses):
-            if response is None or response == "N/O":
+            if response is None:
                 continue
             rating = int(response)
-            scores[statement["field"]] += rating * statement["weight"]
+            scores[statement["field"]] += (rating - 3) * statement["weight"]
 
         ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
 
@@ -137,7 +138,7 @@ class ExpertSystem:
 
         top_id, top_score = ranked[0]
         mean_score = sum(scores.values()) / len(scores)
-        max_possible = top_score if top_score else 1
+        max_possible = top_score if top_score > 0 else 1
         confidence = round(max(0.0, min(100.0, (top_score - mean_score) / max_possible * 100)), 1)
 
         return {
@@ -174,11 +175,9 @@ def analyze():
         )
 
     for r in responses:
-        if r is None or r == "N/O":
-            continue
-        if not (isinstance(r, int) and 1 <= r <= 4):
+        if not (isinstance(r, int) and 1 <= r <= 5):
             return (
-                jsonify({"error": "Each response must be an integer 1-4, or \"N/O\"."}),
+                jsonify({"error": "Each response must be an integer 1-5."}),
                 400,
             )
 

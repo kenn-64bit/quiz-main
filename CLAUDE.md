@@ -35,7 +35,7 @@ Backend must be running before the frontend is useful. No test suite or linter i
 
 ```bash
 curl -X POST http://localhost:5000/api/analyze -H "Content-Type: application/json" \
-  -d '{"name":"K","responses":[4,4,1,1,3,"N/O",4,2,4,3]}'
+  -d '{"name":"K","responses":[5,4,1,1,3,3,4,2,4,3]}'
 ```
 
 ## Architecture
@@ -46,9 +46,9 @@ curl -X POST http://localhost:5000/api/analyze -H "Content-Type: application/jso
 - `self.statements` — 10 quiz statements, each `{id, text, field, weight}` mapping to exactly one field id.
 - `self.roadmaps` — one learning-steps list per field id.
 
-`analyze(responses)` takes a list of 10 items (int `1`–`4`, or `"N/O"`/`null` = skipped) and does `scores[statement.field] += rating * weight`. Confidence is the clamped scaled spread between the top score and the mean of all field scores. Adding a field means touching all three structures plus at least one statement; changing question wording or weights is a `self.statements` edit only.
+`analyze(responses)` takes a list of 10 items (int `1`–`5`, `3` = neutral; `null` = skipped) and does `scores[statement.field] += (rating - 3) * weight`. Confidence is the clamped scaled spread between the top score and the mean of all field scores. Adding a field means touching all three structures plus at least one statement; changing question wording or weights is a `self.statements` edit only.
 
-**API surface** (`/api/health`, `/api/quiz-questions`, `/api/analyze`). `/api/quiz-questions` is derived from `self.statements` and emits `type: "scale"` with a `{min:1, max:4, allow_no_opinion:true}` descriptor — the frontend renders the scale from this, not from hardcoded options. `/api/analyze` validates the responses array (length + value range) and returns 400 on bad input. CORS is enabled app-wide.
+**API surface** (`/api/health`, `/api/quiz-questions`, `/api/analyze`). `/api/quiz-questions` is derived from `self.statements` and emits `type: "scale"` with a `{min:1, max:5, allow_no_opinion:false}` descriptor — the frontend renders the scale from this, not from hardcoded options. `/api/analyze` validates the responses array (length + value range) and returns 400 on bad input. CORS is enabled app-wide.
 
 **Frontend flow.** `App.jsx` is a 3-screen state machine (`start | quiz | results`) holding all state; the screen components (`StartScreen`, `QuizScreen`, `ResultsScreen`) are presentational and receive props/callbacks. `src/api.js` is the only place that calls `fetch` — it prepends `VITE_API_BASE` (empty in dev, so the Vite proxy handles `/api`). All theming lives in the `theme` object at the top of `src/styles.js`; `styles` is a plain CSS-in-JS object, no CSS files.
 

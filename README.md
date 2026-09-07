@@ -4,8 +4,8 @@ A full-stack application with an expert system that analyzes 10 quiz questions t
 
 ## 🎯 Features
 
-- **10-Statement Rating Quiz** - Each question is a statement rated on a 1-4 scale (1 = strongly disagree, 4 = strongly agree), plus an `N/O` (no opinion) option that is skipped in scoring
-- **Expert System** - Rule-based inference engine that maps each statement to a career field and weights the rating to calculate field compatibility scores
+- **10-Statement Rating Quiz** - Each question is a statement rated on a 1-5 scale (1 = strongly disagree, 3 = neutral, 5 = strongly agree)
+- **Expert System** - Rule-based inference engine that maps each statement to a career field and weights the rating offset from neutral to calculate field compatibility scores
 - **6 Career Paths** - Recommends from: Data Science, Web Development, DevOps, Mobile Development, Cybersecurity, and Game Development
 - **Confidence Scoring** - Provides confidence level in recommendations based on response patterns
 - **Alternative Suggestions** - Shows top 3 matching fields with detailed descriptions
@@ -120,7 +120,7 @@ Retrieve all 10 quiz statements.
     "id": 0,
     "question": "I enjoy finding patterns and trends hidden in large amounts of data.",
     "type": "scale",
-    "scale": {"min": 1, "max": 4, "allow_no_opinion": true}
+    "scale": {"min": 1, "max": 5, "allow_no_opinion": false}
   },
   ...
 ]
@@ -129,14 +129,13 @@ Retrieve all 10 quiz statements.
 ### POST /api/analyze
 Analyze quiz responses and get a field recommendation.
 
-**Request:** `responses` is a list of 10 items, each an integer `1`–`4` or the
-string `"N/O"` (also accepts `null`) for "no opinion". `name` is optional and
-echoed back in the response.
+**Request:** `responses` is a list of 10 items, each an integer `1`–`5`
+(`3` = neutral). `name` is optional and echoed back in the response.
 
 ```json
 {
   "name": "Kenn",
-  "responses": [4, 4, 1, 1, 3, "N/O", 4, 2, 4, 3]
+  "responses": [5, 4, 1, 1, 3, 3, 4, 2, 4, 3]
 }
 ```
 
@@ -180,7 +179,7 @@ echoed back in the response.
 The expert system uses a **rule-based inference engine**:
 
 1. **Statement Mapping** - Each of the 10 statements maps to exactly one career field with a weight (1–2)
-2. **Rating Weighting** - `score[field] += rating * weight`, where `rating` is the user's 1–4 answer; `N/O` / `null` contributes nothing
+2. **Rating Weighting** - `score[field] += (rating - 3) * weight`, where `rating` is the user's 1–5 answer; a neutral `3` contributes nothing, below-neutral answers count against the field
 3. **Score Aggregation** - Ratings are summed per field across all statements
 4. **Confidence Calculation** - Scaled spread of the top field's score vs. the mean of all field scores, clamped to 0–100
 5. **Recommendation** - Field with the highest score is the primary recommendation; the next three form the alternatives
@@ -289,7 +288,7 @@ curl http://localhost:5000/api/quiz-questions
 # Test analysis
 curl -X POST http://localhost:5000/api/analyze \
   -H "Content-Type: application/json" \
-  -d '{"name": "Kenn", "responses": [4, 4, 1, 1, 3, "N/O", 4, 2, 4, 3]}'
+  -d '{"name": "Kenn", "responses": [5, 4, 1, 1, 3, 3, 4, 2, 4, 3]}'
 ```
 
 ### Test the Frontend
@@ -339,7 +338,7 @@ Set `VITE_API_BASE` to the deployed backend URL so `src/api.js` targets it.
 - Ensure port 5000 is available
 
 **Recommendations seem incorrect**
-- Verify ratings are sent as integers 1–4 (or `"N/O"`), not strings like `"3"`
+- Verify ratings are sent as integers 1–5, not strings like `"3"`
 - Check `/api/quiz-questions` returns all 10 statements
 - Review statement-to-field mappings and weights in `self.statements`
 

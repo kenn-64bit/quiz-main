@@ -1,11 +1,11 @@
 import { styles } from '../styles.js'
 
 const OPTIONS = [
-  { value: 'N/O', label: 'N/O' },
   { value: 1, label: '1' },
   { value: 2, label: '2' },
   { value: 3, label: '3' },
   { value: 4, label: '4' },
+  { value: 5, label: '5' },
 ]
 
 export default function QuizScreen({
@@ -35,12 +35,12 @@ export default function QuizScreen({
       </div>
       <div style={styles.questionText}>{question.question}</div>
 
-      <div style={styles.scaleRow}>
+      <div style={styles.scaleRow} role="radiogroup">
         {OPTIONS.map((opt) => {
           const selected = current === opt.value
           return (
             <div
-              key={opt.label}
+              key={opt.value}
               role="radio"
               aria-checked={selected}
               tabIndex={0}
@@ -55,8 +55,7 @@ export default function QuizScreen({
         })}
       </div>
       <div style={styles.scaleHint}>
-        <span>N/O = no opinion</span>
-        <span>1 = disagree · 4 = agree</span>
+        <span>1 = strongly disagree · 3 = neutral · 5 = strongly agree</span>
       </div>
 
       {error && <div style={styles.error}>{error}</div>}

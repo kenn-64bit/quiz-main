@@ -18,6 +18,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [showBackModal, setShowBackModal] = useState(false)
 
   useEffect(() => {
     fetchQuestions()
@@ -65,7 +66,12 @@ export default function App() {
     }
   }
 
+  function requestBack() {
+    setShowBackModal(true)
+  }
+
   function goBack() {
+    setShowBackModal(false)
     setError('')
     if (index === 0) {
       setScreen('start')
@@ -79,6 +85,7 @@ export default function App() {
     setIndex(0)
     setResult(null)
     setError('')
+    setShowBackModal(false)
     setScreen('start')
   }
 
@@ -99,11 +106,26 @@ export default function App() {
           index={index}
           responses={responses}
           setResponse={setResponse}
-          onBack={goBack}
+          onBack={requestBack}
           onNext={goNext}
           submitting={submitting}
           error={error}
         />
+      )}
+      {screen === 'quiz' && showBackModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
+            <div>Are you really sure? changes are not saved</div>
+            <div style={styles.modalActions}>
+              <button style={styles.secondaryButton} onClick={() => setShowBackModal(false)}>
+                Stay
+              </button>
+              <button style={{ ...styles.primaryButton, width: 'auto', flex: 1 }} onClick={goBack}>
+                Yes, go back
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {screen === 'results' && result && (
         <ResultsScreen result={result} onRestart={restart} />
