@@ -6,7 +6,7 @@ const globalStyle = document.createElement('style')
 globalStyle.textContent = `
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  body { margin: 0; background: #b7d38c; font-family: 'Courier New', ui-monospace, SFMono-Regular, Menlo, monospace; }
 `
 document.head.appendChild(globalStyle)
 

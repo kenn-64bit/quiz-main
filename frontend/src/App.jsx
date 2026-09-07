@@ -91,27 +91,42 @@ export default function App() {
 
   return (
     <div style={styles.container}>
-      {screen === 'start' && (
-        <StartScreen
-          name={name}
-          setName={setName}
-          onStart={startQuiz}
-          loading={loading}
-          error={error}
-        />
-      )}
-      {screen === 'quiz' && (
-        <QuizScreen
-          questions={questions}
-          index={index}
-          responses={responses}
-          setResponse={setResponse}
-          onBack={requestBack}
-          onNext={goNext}
-          submitting={submitting}
-          error={error}
-        />
-      )}
+      <div style={styles.frame}>
+        <div style={styles.titlebar}>🎧 Tech Stack Quiz</div>
+        {screen === 'quiz' && (
+          <div style={styles.subCaption}>
+            ☀ ▾ (rate each statement — 1 disagree · 3 neutral · 5 agree)
+          </div>
+        )}
+
+        {screen === 'start' && (
+          <StartScreen
+            name={name}
+            setName={setName}
+            onStart={startQuiz}
+            loading={loading}
+            error={error}
+          />
+        )}
+        {screen === 'quiz' && (
+          <QuizScreen
+            questions={questions}
+            index={index}
+            responses={responses}
+            setResponse={setResponse}
+            onBack={requestBack}
+            onNext={goNext}
+            submitting={submitting}
+            error={error}
+          />
+        )}
+        {screen === 'results' && result && (
+          <ResultsScreen result={result} onRestart={restart} />
+        )}
+
+        <div style={styles.footerStrip}>› by yourstruly</div>
+      </div>
+
       {screen === 'quiz' && showBackModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
@@ -126,9 +141,6 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
-      {screen === 'results' && result && (
-        <ResultsScreen result={result} onRestart={restart} />
       )}
     </div>
   )

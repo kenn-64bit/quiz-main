@@ -30,6 +30,9 @@ export default function QuizScreen({
         <div style={{ ...styles.progressFill, width: `${progress}%` }} />
       </div>
 
+      <div style={{ ...styles.sectionHeading, alignSelf: 'center', margin: '0 0 12px' }}>
+        ✳ Statement
+      </div>
       <div style={styles.questionNumber}>
         Question {index + 1} of {questions.length}
       </div>

@@ -235,16 +235,25 @@ Higher weight = a given rating counts for more toward that field.
 ### Colors & Styling
 
 The frontend uses CSS-in-JS styling in the `styles` object. The whole theme is
-defined in one place:
+defined in one place — an early-2000s Windows-XP / Frutiger-Aero "carrd" look
+(glossy lime titlebar, beveled panels, monospace type):
 
 ```javascript
 // In frontend/src/styles.js
 const theme = {
-  gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',  // Change gradient
-  accent: '#667eea',
+  pageBg: '#b7d38c',          // page background
+  titlebarFrom: '#e9f4d4',    // glossy titlebar gradient
+  titlebarTo: '#a9cd6e',
+  green: '#7ba428',           // accent / links / bold
+  ink: '#4c4a3c',             // headings / button text
+  body: '#6f7d4f',            // monospace body text
+  mono: "'Courier New', ui-monospace, monospace",
   // ...
 }
 ```
+
+The shared window chrome (titlebar, sub-caption, footer strip) lives in
+`frontend/src/App.jsx` around the screen switch.
 
 ### Quiz Statements
 

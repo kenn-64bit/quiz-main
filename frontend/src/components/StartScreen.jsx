@@ -5,8 +5,8 @@ export default function StartScreen({ name, setName, onStart, loading, error }) 
 
   return (
     <div style={styles.phone}>
-      <div style={styles.kicker}>short quiz</div>
-      <h1 style={styles.title}>Where does your code belong?</h1>
+      <div style={styles.kicker}>› short quiz</div>
+      <h1 style={styles.title}>★ Where does your code belong?</h1>
 
       <div style={styles.label}>Enter your name</div>
       <input
@@ -27,8 +27,6 @@ export default function StartScreen({ name, setName, onStart, loading, error }) 
       >
         {loading ? 'Loading…' : 'Start Quiz →'}
       </button>
-
-      <div style={styles.footerBadge}>by yourstruly</div>
     </div>
   )
 }
