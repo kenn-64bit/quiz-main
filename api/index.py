@@ -1,12 +1,15 @@
 """Tech Stack Field Recommendation Quiz — Flask expert-system backend.
 
-The quiz presents 10 first-person statements. The user rates each one on a
-1-5 scale (1 = strongly disagree, 3 = neutral, 5 = strongly agree). Each
-non-neutral answer is turned into a *fact* and fed to a miniature
-production-rule engine (`RuleEngine`) that fires scoring rules on an
-agenda. The field with the highest total score is the primary
-recommendation; the ordered list of fired-rule explanations is returned
-as `reasoning`.
+The quiz presents 24 first-person statements (3 per career field). The user
+rates each one on a 1-5 scale (1 = strongly disagree, 3 = neutral, 5 =
+strongly agree). Every answer is first *centered* on the respondent's own
+mean rating (so "agrees with everything" carries no signal), then answers
+that stand out for that person are turned into *facts* and fed to a
+miniature production-rule engine (`RuleEngine`) that fires scoring rules on
+an agenda. The field with the highest total score is the primary
+recommendation; the ordered list of fired-rule explanations is returned as
+`reasoning`. `confidence` blends how far #1 beat #2, how strong #1 is, and
+how consistent the winning field's answers are.
 
 The engine is a deliberately small illustration of two classic
 expert-system ideas — see `RuleEngine`'s docstring:
@@ -80,6 +83,14 @@ def _rate_limit():
     return None
 
 
+# --- Scoring / confidence tunables --------------------------------------------
+# All hand-set; documented in README.md ("Expert System Logic").
+CENTER_EPS = 0.5          # answers within this of the respondent's own mean carry no signal
+CONF_SCALE = 6.0          # ~ max plausible per-field score (~2 per statement x 3 statements)
+CONF_WEIGHTS = (0.5, 0.25, 0.25)   # blend weights: separation / signal / consistency
+TIE_THRESHOLD = 0.15      # normalized top-vs-second gap below which it is a "close call"
+
+
 # ---------------------------------------------------------------------------
 # Rule engine
 # ---------------------------------------------------------------------------
@@ -104,8 +115,9 @@ def _rate_limit():
 def rule_affinity(engine, fact):
     """Generic: a single "I agree" answer nudges its field up.
 
-    Trigger: `affinity`. One condition, ordinary priority. The delta here is
-    exactly the old `(rating - 3) * weight`, so base scoring is unchanged.
+    Trigger: `affinity`. One condition, ordinary priority. `strength` is the
+    answer's distance *above* the respondent's own mean rating (see
+    `assert_rating`), so the delta measures relative — not absolute — interest.
     """
     _, field, strength, weight, sid = fact
     delta = strength * weight
@@ -115,7 +127,7 @@ def rule_affinity(engine, fact):
         "specificity": 1,
         "key": ("strong-affinity", sid),
         "delta": {field: delta},
-        "note": f"Leaned into {engine.field_name(field)} (Q{sid + 1}) → +{delta}",
+        "note": f"Leaned into {engine.field_name(field)} (Q{sid + 1}) → {delta:+.1f}",
     }
 
 
@@ -129,17 +141,18 @@ def rule_aversion(engine, fact):
         "specificity": 1,
         "key": ("strong-aversion", sid),
         "delta": {field: -delta},
-        "note": f"Pushed back on {engine.field_name(field)} (Q{sid + 1}) → -{delta}",
+        "note": f"Pushed back on {engine.field_name(field)} (Q{sid + 1}) → {-delta:+.1f}",
     }
 
 
 def rule_paired_affinity(engine, fact):
-    """Specific: BOTH statements for one field got an "agree".
+    """Specific: two or more statements for one field got an "agree".
 
-    Trigger: `affinity`. Two conditions, so it is more *specific* than
-    `rule_affinity`; it is also given a higher *salience* so it lands first
-    in the trace. (Even at equal salience the higher specificity would win
-    the tie.) Fires once per field via its `key`.
+    Trigger: `affinity`. More *specific* than `rule_affinity` (it tests several
+    facts) and higher *salience*, so it lands first in the trace. It contributes
+    **no score** — within-field agreement is a *certainty* signal, and that is
+    folded into `confidence` (see `ExpertSystem.analyze`), not the score. This
+    rule only adds an explanation line. Fires once per field via its `key`.
     """
     _, field, *_ = fact
     hits = [f for f, _rec in engine.alpha["affinity"] if f[1] == field]
@@ -150,13 +163,13 @@ def rule_paired_affinity(engine, fact):
         "salience": 20,
         "specificity": 2,
         "key": ("paired-affinity", field),
-        "delta": {field: 2},
-        "note": f"Two answers both point at {engine.field_name(field)} → +2 bonus",
+        "delta": {},
+        "note": f"Multiple answers point at {engine.field_name(field)}",
     }
 
 
 def rule_paired_aversion(engine, fact):
-    """Specific: BOTH statements for one field got a "disagree" (symmetric)."""
+    """Specific: two or more statements for one field got a "disagree" (symmetric)."""
     _, field, *_ = fact
     hits = [f for f, _rec in engine.alpha["aversion"] if f[1] == field]
     if len(hits) < 2:
@@ -166,32 +179,13 @@ def rule_paired_aversion(engine, fact):
         "salience": 20,
         "specificity": 2,
         "key": ("paired-aversion", field),
-        "delta": {field: -2},
-        "note": f"Two answers both reject {engine.field_name(field)} → -2",
-    }
-
-
-def rule_broad_enthusiasm(engine, fact):
-    """Generic catch-all: agreed with almost everything.
-
-    Trigger: `affinity`. Zero scored conditions and low salience, so it
-    always resolves *last* — the classic "generic rule loses to specific
-    ones". Adds no score, only a caveat to the trace.
-    """
-    if len(engine.alpha["affinity"]) < 5:
-        return None
-    return {
-        "name": "broad-enthusiasm",
-        "salience": 5,
-        "specificity": 0,
-        "key": ("broad-enthusiasm",),
         "delta": {},
-        "note": "You reacted positively to most statements — the top match is less clear-cut.",
+        "note": f"Multiple answers push back on {engine.field_name(field)}",
     }
 
 
 RULES_BY_TRIGGER = {
-    "affinity": [rule_affinity, rule_paired_affinity, rule_broad_enthusiasm],
+    "affinity": [rule_affinity, rule_paired_affinity],
     "aversion": [rule_aversion, rule_paired_aversion],
 }
 
@@ -247,13 +241,20 @@ class RuleEngine:
                 activation["recency"] = self.clock
                 self.agenda.append(activation)
 
-    def assert_rating(self, statement, rating):
-        """Translate a 1-5 answer into a fact (neutral 3 asserts nothing)."""
+    def assert_rating(self, statement, centered):
+        """Translate a baseline-centered answer into a fact.
+
+        `centered` is the 1-5 answer minus the respondent's own mean rating, so
+        it is positive when they liked this statement *more* than their personal
+        average and negative when less. Answers within `CENTER_EPS` of their
+        baseline carry no preference signal and assert nothing — this is what
+        stops "agree with everything" from lighting up every field.
+        """
         field, weight, sid = statement["field"], statement["weight"], statement["id"]
-        if rating >= 4:
-            self.assert_fact(("affinity", field, rating - 3, weight, sid))
-        elif rating <= 2:
-            self.assert_fact(("aversion", field, 3 - rating, weight, sid))
+        if centered > CENTER_EPS:
+            self.assert_fact(("affinity", field, centered, weight, sid))
+        elif centered < -CENTER_EPS:
+            self.assert_fact(("aversion", field, -centered, weight, sid))
 
     # -- Conflict resolution: order the agenda, then fire once each -------
     def run(self):
@@ -315,24 +316,34 @@ class ExpertSystem:
         }
 
         # Each statement maps to exactly one field. Every field has the same
-        # number of statements and every weight is 1, so no field is favoured.
+        # number of statements (3) and every weight is 1, so no field is
+        # favoured. Statements are grouped by field for readability only; the
+        # `id` is the position the frontend sends back in `responses`.
         self.statements = [
             {"id": 0, "text": "I enjoy finding patterns and trends in data. Big Numbers === Stonks.", "field": "data_science", "weight": 1},
             {"id": 1, "text": "Working with statistics and math models sounds like money.", "field": "data_science", "weight": 1},
-            {"id": 2, "text": "I like seeing an interface come to life visually as I build it brick by brick.", "field": "web_development", "weight": 1},
-            {"id": 3, "text": "I care a lot about how a product looks and feels to the people using it.", "field": "web_development", "weight": 1},
-            {"id": 4, "text": "I want to Automating repetitive tasks, think smarter not harder.", "field": "devops", "weight": 1},
-            {"id": 5, "text": "I enjoy making sure a system stays fast and online as it grows to millions of users, CS MENTALITY!.", "field": "devops", "weight": 1},
-            {"id": 6, "text": "Building an app that lives in someone's pocket and taps the camera, GPS, and sensors excites me.", "field": "mobile_development", "weight": 1},
-            {"id": 7, "text": "Designing smooth touch interactions and offline-friendly apps for phones sounds great.", "field": "mobile_development", "weight": 1},
-            {"id": 8, "text": "I like thinking about how hackers break into systems and how to reverse engineer them.", "field": "cybersecurity", "weight": 1},
-            {"id": 9, "text": "Hardening systems, hunting for vulnerabilities, and responding to incidents appeals to me.", "field": "cybersecurity", "weight": 1},
-            {"id": 10, "text": "I enjoy building game worlds, physics, and real-time graphics.", "field": "game_development", "weight": 1},
-            {"id": 11, "text": "I want to build something creative and interactive that people play with for fun.", "field": "game_development", "weight": 1},
-            {"id": 12, "text": "Repairing a Washing Machine sounds like a fun challenge.", "field": "iot", "weight": 1},
-            {"id": 13, "text": "I like microcontrollers and embedded systems.", "field": "iot", "weight": 1},
-            {"id": 14, "text": "I like how data travels across networks and how it gets to its destination.", "field": "networking", "weight": 1},
-            {"id": 15, "text": "I want my response times 0.200 seconds than 0.500 seconds.", "field": "networking", "weight": 1},
+            {"id": 2, "text": "I'd happily spend an afternoon cleaning a messy dataset to see what story it tells.", "field": "data_science", "weight": 1},
+            {"id": 3, "text": "I like seeing an interface come to life visually as I build it brick by brick.", "field": "web_development", "weight": 1},
+            {"id": 4, "text": "I care a lot about how a product looks and feels to the people using it.", "field": "web_development", "weight": 1},
+            {"id": 5, "text": "Wiring a form up to a database and shipping it the same day sounds satisfying.", "field": "web_development", "weight": 1},
+            {"id": 6, "text": "I want to Automating repetitive tasks, think smarter not harder.", "field": "devops", "weight": 1},
+            {"id": 7, "text": "I enjoy making sure a system stays fast and online as it grows to millions of users, CS MENTALITY!.", "field": "devops", "weight": 1},
+            {"id": 8, "text": "I get a kick out of turning a manual deploy checklist into a one-click pipeline.", "field": "devops", "weight": 1},
+            {"id": 9, "text": "Building an app that lives in someone's pocket and taps the camera, GPS, and sensors excites me.", "field": "mobile_development", "weight": 1},
+            {"id": 10, "text": "Designing smooth touch interactions and offline-friendly apps for phones sounds great.", "field": "mobile_development", "weight": 1},
+            {"id": 11, "text": "I notice how an app feels in the hand — the gestures, the haptics, the transitions.", "field": "mobile_development", "weight": 1},
+            {"id": 12, "text": "I like thinking about how hackers break into systems and how to reverse engineer them.", "field": "cybersecurity", "weight": 1},
+            {"id": 13, "text": "Hardening systems, hunting for vulnerabilities, and responding to incidents appeals to me.", "field": "cybersecurity", "weight": 1},
+            {"id": 14, "text": "Reading a breach post-mortem to work out exactly how it happened is my idea of fun.", "field": "cybersecurity", "weight": 1},
+            {"id": 15, "text": "I enjoy building game worlds, physics, and real-time graphics.", "field": "game_development", "weight": 1},
+            {"id": 16, "text": "I want to build something creative and interactive that people play with for fun.", "field": "game_development", "weight": 1},
+            {"id": 17, "text": "Tuning jump height and enemy timing until a level 'feels right' appeals to me.", "field": "game_development", "weight": 1},
+            {"id": 18, "text": "Repairing a Washing Machine sounds like a fun challenge.", "field": "iot", "weight": 1},
+            {"id": 19, "text": "I like microcontrollers and embedded systems.", "field": "iot", "weight": 1},
+            {"id": 20, "text": "Wiring a sensor on a breadboard and watching real-world readings appear excites me.", "field": "iot", "weight": 1},
+            {"id": 21, "text": "I like how data travels across networks and how it gets to its destination.", "field": "networking", "weight": 1},
+            {"id": 22, "text": "I want my response times 0.200 seconds than 0.500 seconds.", "field": "networking", "weight": 1},
+            {"id": 23, "text": "I enjoy tracing why a connection is slow — DNS, routing, packet loss — hop by hop.", "field": "networking", "weight": 1},
         ]
 
         self.roadmaps = {
@@ -406,10 +417,26 @@ class ExpertSystem:
         ]
 
     def analyze(self, responses):
+        # --- 1. Center each answer on the respondent's own mean rating -------
+        # Removes response-style bias: someone who agrees with everything ends
+        # up near zero on every field (their mean is high, so nothing stands
+        # out); only answers that deviate *from their own average* move a
+        # score. With too few answers the mean is unreliable, so fall back to
+        # the absolute neutral point (3).
+        answered = [int(r) for r in responses if r is not None]
+        if len(answered) >= 4:
+            baseline = sum(answered) / len(answered)
+        else:
+            baseline = 3.0
+
+        centered_by_sid = {}
         engine = RuleEngine(self.fields)
         for statement, response in zip(self.statements, responses):
-            if response is not None:
-                engine.assert_rating(statement, int(response))
+            if response is None:
+                continue
+            centered = int(response) - baseline
+            centered_by_sid[statement["id"]] = centered
+            engine.assert_rating(statement, centered)
         scores, reasoning = engine.run()
 
         ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
@@ -419,19 +446,46 @@ class ExpertSystem:
                 "field_id": field_id,
                 "name": self.fields[field_id]["name"],
                 "description": self.fields[field_id]["description"],
-                "score": score,
+                "score": round(score, 1),
             }
 
+        def clamp01(x):
+            return max(0.0, min(1.0, x))
+
         top_id, top_score = ranked[0]
-        mean_score = sum(scores.values()) / len(scores)
-        max_possible = top_score if top_score > 0 else 1
-        confidence = round(max(0.0, min(100.0, (top_score - mean_score) / max_possible * 100)), 1)
+        second_score = ranked[1][1] if len(ranked) > 1 else 0.0
+
+        # --- 2. Confidence = blend of three [0,1] factors -------------------
+        #   separation  — how far #1 beat #2 (the headline question)
+        #   signal      — is the winner itself clearly above zero
+        #   consistency — do the winning field's statements agree in direction
+        separation = clamp01((top_score - second_score) / CONF_SCALE)
+        signal = clamp01(top_score / CONF_SCALE)
+
+        top_dirs = [centered_by_sid.get(s["id"], 0.0)
+                    for s in self.statements if s["field"] == top_id]
+        agree = sum(1 for d in top_dirs if d > CENTER_EPS)
+        oppose = sum(1 for d in top_dirs if d < -CENTER_EPS)
+        consistency = clamp01((agree - oppose) / (len(top_dirs) or 1))
+
+        w_sep, w_sig, w_con = CONF_WEIGHTS
+        if top_score <= 0:
+            confidence = 0.0
+        else:
+            confidence = round(max(0.0, min(100.0, 100.0 * (
+                w_sep * separation + w_sig * signal + w_con * consistency))), 1)
+
+        close_call = bool(
+            top_score > 0
+            and (top_score - second_score) / CONF_SCALE < TIE_THRESHOLD
+        )
 
         return {
             "primary_recommendation": as_field(top_id, top_score),
             "alternative_recommendations": [as_field(fid, sc) for fid, sc in ranked[1:4]],
             "confidence": confidence,
-            "all_scores": scores,
+            "close_call": close_call,
+            "all_scores": {fid: round(sc, 1) for fid, sc in scores.items()},
             "recommendations": self.roadmaps[top_id],
             "reasoning": reasoning,
         }
