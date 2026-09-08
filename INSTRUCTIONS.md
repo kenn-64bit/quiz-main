@@ -75,7 +75,32 @@ npm run preview                                          # serve the build local
 `src/api.js` reads `VITE_API_BASE`; if unset it uses a same-origin `/api` path
 (useful when the frontend and backend are served from the same domain).
 
-### 1.5 Deploy the backend
+### 1.5 Deploy to Vercel (frontend + API, one project)
+
+The repo has a `vercel.json` that builds the React app as a static site **and**
+runs `quiz_backend.py` as a Python serverless function at `/api/*` — same
+domain, so no CORS and no `VITE_API_BASE` needed.
+
+```bash
+cd "/home/kenn/Documents/Cloned Projects/quiz"
+npm i -g vercel
+vercel            # first run links/creates the project — accept the defaults
+vercel --prod
+```
+
+Or import the Git repo at vercel.com → **New Project**; leave every build
+setting on default (`vercel.json` supplies them). Pieces involved:
+
+- `vercel.json` — `@vercel/static-build` on `frontend/package.json` (output
+  `frontend/dist`) + `@vercel/python` on `api/index.py`; routes send `/api/*`
+  to the function and everything else to the static build.
+- `api/index.py` — imports the Flask `app` from `quiz_backend.py` (bundled via
+  `includeFiles`).
+- `requirements.txt` — installed for the function automatically.
+
+Deploying elsewhere? Use the split setup below (1.6–1.7).
+
+### 1.6 Deploy the backend (non-Vercel)
 
 Any host that runs a WSGI app works. Use **gunicorn** (already in
 `requirements.txt`):
@@ -94,25 +119,16 @@ gunicorn quiz_backend:app --bind 0.0.0.0:$PORT
 CORS is already enabled app-wide (`flask_cors.CORS(app)`), so a separately-hosted
 frontend can call it. Note the backend's public URL for the next step.
 
-### 1.6 Deploy the frontend
+### 1.7 Deploy the frontend (non-Vercel)
 
-Static host (Vercel, Netlify, Cloudflare Pages, GitHub Pages, S3+CloudFront):
+Static host (Netlify, Cloudflare Pages, GitHub Pages, S3+CloudFront):
 
 - **Root / project directory:** `frontend`
 - **Build command:** `npm run build`
 - **Output directory:** `dist`
-- **Environment variable:** `VITE_API_BASE = https://your-backend-url` (from 1.5)
+- **Environment variable:** `VITE_API_BASE = https://your-backend-url` (from 1.6)
 
-Vercel example:
-
-```bash
-cd "/home/kenn/Documents/Cloned Projects/quiz/frontend"
-npm i -g vercel
-vercel                 # follow prompts; set VITE_API_BASE in project settings
-vercel --prod
-```
-
-### 1.7 Common issues
+### 1.8 Common issues
 
 | Symptom | Fix |
 |---|---|

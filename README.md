@@ -339,29 +339,39 @@ curl -X POST http://localhost:5000/api/analyze \
 
 ## 🚢 Deployment
 
-### Deploy Backend (Heroku Example)
+### Vercel (frontend + API in one project) — recommended
+
+The repo ships a `vercel.json`: the React app is built as a static site and
+`quiz_backend.py` runs as a Python serverless function at `/api/*` on the same
+domain, so there is **no CORS setup and no `VITE_API_BASE` to configure**.
 
 ```bash
-# Create Procfile
-echo "web: gunicorn quiz_backend:app" > Procfile
-
-# Create requirements.txt (if not exists)
-pip freeze > requirements.txt
-
-# Deploy
-heroku create
-git push heroku main
+npm i -g vercel
+vercel            # from the repo root; accept the defaults
+vercel --prod
 ```
 
-### Deploy Frontend (Vercel Example)
+Or import the Git repo on vercel.com and leave all build settings on default.
+
+- `vercel.json` — static build of `frontend/` + `@vercel/python` on
+  `api/index.py`; `/api/*` → the function, everything else → the static build.
+- `api/index.py` — re-exports the Flask `app` from `quiz_backend.py`.
+- `requirements.txt` — installed for the function automatically.
+
+### Split hosting (backend elsewhere)
+
+Backend on any WSGI host (Render, Railway, Fly, Heroku):
 
 ```bash
-cd frontend
-npm install -g vercel
-vercel
+echo "web: gunicorn quiz_backend:app" > Procfile   # Heroku
+# or start command: gunicorn quiz_backend:app --bind 0.0.0.0:$PORT
 ```
 
-Set `VITE_API_BASE` to the deployed backend URL so `src/api.js` targets it.
+Frontend on any static host — build `frontend/` with
+`VITE_API_BASE=https://your-backend-url npm run build` so `src/api.js` targets
+the deployed backend.
+
+See `INSTRUCTIONS.md` §1.5–1.7 for step-by-step commands.
 
 ## 🐛 Troubleshooting
 
