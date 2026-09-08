@@ -354,8 +354,8 @@ vercel --prod
 Or import the Git repo on vercel.com and leave all build settings on default.
 
 - `vercel.json` — static build of `frontend/` + `@vercel/python` on
-  `api/index.py`; `/api/*` → the function, everything else → the static build.
-- `api/index.py` — re-exports the Flask `app` from `quiz_backend.py`.
+  `api/[...path].py`; `/api/*` → the function, everything else → the static build.
+- `api/[...path].py` — re-exports the Flask `app` from `quiz_backend.py`.
 - `requirements.txt` — installed for the function automatically.
 
 ### Split hosting (backend elsewhere)

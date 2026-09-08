@@ -92,9 +92,9 @@ Or import the Git repo at vercel.com → **New Project**; leave every build
 setting on default (`vercel.json` supplies them). Pieces involved:
 
 - `vercel.json` — `@vercel/static-build` on `frontend/package.json` (output
-  `frontend/dist`) + `@vercel/python` on `api/index.py`; routes send `/api/*`
+  `frontend/dist`) + `@vercel/python` on `api/[...path].py` (a catch-all function); `/api/*`
   to the function and everything else to the static build.
-- `api/index.py` — imports the Flask `app` from `quiz_backend.py` (bundled via
+- `api/[...path].py` — imports the Flask `app` from `quiz_backend.py` (bundled via
   `includeFiles`).
 - `requirements.txt` — installed for the function automatically.
 
