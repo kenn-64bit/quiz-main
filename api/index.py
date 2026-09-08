@@ -16,26 +16,37 @@ expert-system ideas — see `RuleEngine`'s docstring:
                              recency) with refraction
 
 Deployment: this file lives at `api/index.py`, one of Vercel's default
-Python/Flask entrypoint locations, so Vercel's runtime auto-detects the
-module-level `app` (a WSGI callable) and mounts it for `/api/*`. It is the
-ONLY module in the repo that defines a Flask `app`. Do NOT add an `/api/*`
-`rewrites` rule to `vercel.json` — Vercel routes internal rewrites by their
-rewritten destination path, which would hand Flask the wrong URL. `vercel.json`
-only configures the frontend build; the static site is served from
-`frontend/dist` and this function handles `/api/*`.
+Python entrypoint locations, so Vercel auto-detects the module-level `app`
+(a WSGI callable). Because `package.json` is under `frontend/`, Vercel treats
+the repo as a Python project and routes EVERY path to this function — so Flask
+serves the built frontend too (`serve_frontend` below), and `vercel.json`
+bundles `frontend/dist` into the function via `functions.includeFiles`.
+`buildCommand` in `vercel.json` runs the Vite build first. Do NOT add an
+`/api/*` `rewrites` rule — Vercel routes internal rewrites by their rewritten
+destination path, which would hand Flask the wrong URL.
 
-Run locally: `python api/index.py` (serves http://localhost:5000, debug=True).
+Run locally: `python api/index.py` (API on http://localhost:5000, debug=True);
+the frontend runs separately via `npm run dev` (port 5173).
 """
 
+import os
 import time
 from collections import defaultdict, deque
 from threading import Lock
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+
+# The built Vite frontend, bundled into the serverless function via
+# `vercel.json` -> functions.includeFiles. Vercel detects this repo as a
+# Python project (package.json lives in frontend/), so it routes *every* path
+# to this function — Flask therefore has to serve the static site itself.
+_FRONTEND_DIST = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist"
+)
 
 # --- Simple per-IP sliding-window rate limiting -----------------------------
 # Best-effort: state is per-process, so on a serverless/multi-worker host it
@@ -49,8 +60,8 @@ _rate_lock = Lock()
 
 @app.before_request
 def _rate_limit():
-    if request.method == "OPTIONS":
-        return None
+    if request.method == "OPTIONS" or not request.path.startswith("/api/"):
+        return None  # only rate-limit the API, not static asset loads
     ip = (request.headers.get("x-forwarded-for", request.remote_addr or "?")
           .split(",")[0].strip())
     now = time.monotonic()
@@ -460,6 +471,26 @@ def analyze():
     result = engine.analyze(responses)
     result["name"] = (data.get("name") or "").strip()
     return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
+# Static frontend (production only)
+# ---------------------------------------------------------------------------
+# Serve the built Vite app for every non-API path. The `/api/*` rules above are
+# more specific, so Werkzeug matches them first; anything else falls through to
+# here. In local dev the frontend runs on its own Vite server (port 5173) and
+# `_FRONTEND_DIST` usually doesn't exist — that's fine, these routes just 404.
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_frontend(path):
+    if path.startswith("api/"):
+        return jsonify({"error": "Not found"}), 404
+    file_path = os.path.join(_FRONTEND_DIST, path)
+    if path and os.path.isfile(file_path):
+        return send_from_directory(_FRONTEND_DIST, path)
+    return send_from_directory(_FRONTEND_DIST, "index.html")  # SPA entry
 
 
 if __name__ == "__main__":

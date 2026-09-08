@@ -355,13 +355,17 @@ vercel --prod
 
 Or import the Git repo on vercel.com and leave all build settings on default.
 
-- `vercel.json` — only `buildCommand` + `outputDirectory` (`frontend/dist`), no
-  `routes`/`rewrites`. Vercel serves the static build from its CDN and routes
-  `/api/*` to the Python function. Do **not** add an `/api/*` rewrite (Vercel
-  routes internal rewrites by their rewritten destination path → breaks Flask).
-- `api/index.py` — the Flask `app`; the only `app` in the repo and at a
-  canonical Vercel Python entrypoint location, so it is auto-detected (no
-  `functions`/`includeFiles` needed).
+- Vercel detects this repo as a **Python project** (the `package.json` is under
+  `frontend/`) and routes every request to `api/index.py`, so Flask serves the
+  built frontend as well as the API.
+- `vercel.json` — `buildCommand` runs the Vite build; `outputDirectory` is
+  `frontend/dist`; `functions."api/index.py".includeFiles` bundles
+  `frontend/dist/**` into the serverless function. No `routes`/`rewrites` — do
+  **not** add an `/api/*` rewrite (Vercel routes internal rewrites by their
+  rewritten destination path → breaks Flask).
+- `api/index.py` — the Flask `app`: `/api/*` routes plus a `serve_frontend`
+  catch-all that returns files from `frontend/dist` (SPA fallback to
+  `index.html`).
 - `requirements.txt` (repo root) — installed for the function automatically.
 
 ### Split hosting (backend elsewhere)
