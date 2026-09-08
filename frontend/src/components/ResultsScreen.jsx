@@ -70,8 +70,8 @@ export default function ResultsScreen({ result, onRestart }) {
             style={{ ...styles.modalCard, textAlign: 'left', maxWidth: 380 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={styles.sectionHeading}>🧠 How we got here</div>
-            <ul style={{ margin: '4px 0 0', padding: 0, listStyle: 'none' }}>
+            <div style={{ ...styles.sectionHeading, flexShrink: 0 }}>🧠 How we got here</div>
+            <ul style={{ ...styles.modalScroll, marginTop: 4 }}>
               {reasoning.map((line, i) => (
                 <li key={i} style={styles.roadmapItem}>
                   <span style={{ position: 'absolute', left: 0, color: styles.theme.green }}>›</span>

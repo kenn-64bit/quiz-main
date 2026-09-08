@@ -33,11 +33,13 @@ export const styles = {
     padding: '24px 16px',
     fontFamily: theme.mono,
     color: theme.body,
+    overflowX: 'hidden',
   },
 
   frame: {
     width: '100%',
     maxWidth: 440,
+    minWidth: 0,
     background: theme.frame,
     borderRadius: 18,
     border: '1px solid #ffffff',
@@ -78,6 +80,8 @@ export const styles = {
     flexDirection: 'column',
     fontFamily: theme.mono,
     color: theme.body,
+    minWidth: 0,
+    overflowWrap: 'anywhere',
   },
 
   kicker: {
@@ -308,6 +312,7 @@ export const styles = {
     paddingLeft: 20,
     position: 'relative',
     color: theme.body,
+    overflowWrap: 'anywhere',
   },
 
   footerStrip: {
@@ -329,6 +334,7 @@ export const styles = {
     alignItems: 'center',
     padding: 16,
     zIndex: 50,
+    overflowY: 'auto',
   },
   modalCard: {
     background: theme.panel,
@@ -339,15 +345,27 @@ export const styles = {
     padding: 24,
     maxWidth: 320,
     width: '100%',
+    maxHeight: 'calc(100vh - 32px)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
     textAlign: 'center',
     fontFamily: theme.mono,
     fontSize: 14,
     fontWeight: 700,
   },
+  modalScroll: {
+    overflowY: 'auto',
+    minHeight: 0,
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
   modalActions: {
     display: 'flex',
     gap: 12,
     marginTop: 20,
+    flexShrink: 0,
   },
 
   error: {

@@ -5,9 +5,9 @@ export default function StartScreen({ name, setName, onStart, loading, error }) 
 
   return (
     <div style={styles.phone}>
-      <div style={styles.kicker}>› short quiz</div>
-      <h1 style={styles.title}>★ Where does your code belong?</h1>
-
+      <div style={styles.kicker}>› Answer this quiz to start Larping!
+      </div>
+      <h1 style={styles.title}>★ What kind of dev are you?</h1>
       <div style={styles.label}>Enter your name</div>
       <input
         style={styles.input}
