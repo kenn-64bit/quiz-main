@@ -170,19 +170,43 @@ Analyze quiz responses and get a field recommendation.
     "Learn Python and libraries like pandas, scikit-learn, and TensorFlow.",
     "Master SQL and databases for data manipulation.",
     "..."
+  ],
+  "reasoning": [
+    "Two answers both point at Data Science & AI → +2 bonus",
+    "Leaned into Data Science & AI (Q1) → +4",
+    "Leaned into Data Science & AI (Q2) → +2"
   ]
 }
 ```
 
 ## 🧠 Expert System Logic
 
-The expert system uses a **rule-based inference engine**:
+Non-neutral answers are turned into **facts** and fed to a miniature
+production-rule engine (`RuleEngine` in `quiz_backend.py`) that illustrates two
+classic expert-system ideas:
 
-1. **Statement Mapping** - Each of the 10 statements maps to exactly one career field with a weight (1–2)
-2. **Rating Weighting** - `score[field] += (rating - 3) * weight`, where `rating` is the user's 1–5 answer; a neutral `3` contributes nothing, below-neutral answers count against the field
-3. **Score Aggregation** - Ratings are summed per field across all statements
-4. **Confidence Calculation** - Scaled spread of the top field's score vs. the mean of all field scores, clamped to 0–100
-5. **Recommendation** - Field with the highest score is the primary recommendation; the next three form the alternatives
+1. **Smart Rule Matching** (the Rete algorithm's *alpha network*) - facts are
+   indexed by type; a newly asserted fact only wakes the rules that react to
+   that type, and a fact already in working memory is ignored. No full rescan.
+2. **Tie-Breakers for Rules** (*conflict resolution*) - when several rules are
+   ready, the agenda is ordered by **salience** (hand-set priority) → then
+   **specificity** (more conditions wins) → then **recency** (newest fact wins).
+   Each activation fires once (**refraction**).
+
+Pipeline:
+
+1. **Fact assertion** - `rating ≥ 4` → an `affinity` fact for that field,
+   `rating ≤ 2` → an `aversion` fact; a neutral `3` asserts nothing.
+2. **Rule firing** - single-condition rules apply `±(strength × weight)` — the
+   same magnitude as the old `(rating - 3) * weight`. A more *specific*,
+   higher-*salience* rule adds a `±2` bonus when **both** statements for a field
+   agree (or both disagree). A low-salience generic rule adds only a caveat.
+3. **Score aggregation** - `score[field]` = sum of the deltas of the rules that
+   fired.
+4. **Confidence Calculation** - Scaled spread of the top field's score vs. the
+   mean of all field scores, clamped to 0–100.
+5. **Recommendation** - highest score is the primary recommendation; the next
+   three are alternatives. `reasoning` is the fired rules' notes in agenda order.
 
 ### Statements & Field Mapping
 
@@ -276,6 +300,7 @@ The system provides:
 3. **Alternative Fields** - Top 2-3 secondary options
 4. **Score Breakdown** - Scores for all 6 fields
 5. **Learning Roadmap** - Specific steps to follow
+6. **Reasoning** - The rules that fired, in agenda order (shown as "How we got here")
 
 ### Interpretation
 

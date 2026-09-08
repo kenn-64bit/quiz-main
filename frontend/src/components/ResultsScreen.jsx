@@ -48,6 +48,20 @@ export default function ResultsScreen({ result, onRestart }) {
         ))}
       </ul>
 
+      {Array.isArray(result.reasoning) && result.reasoning.length > 0 && (
+        <>
+          <div style={styles.sectionHeading}>🧠 How we got here</div>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+            {result.reasoning.map((line, i) => (
+              <li key={i} style={styles.roadmapItem}>
+                <span style={{ position: 'absolute', left: 0, color: styles.theme.green }}>›</span>
+                {line}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <button style={{ ...styles.primaryButton, marginTop: 24 }} onClick={onRestart}>
         Retake quiz
       </button>

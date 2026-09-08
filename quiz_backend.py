@@ -2,17 +2,222 @@
 
 The quiz presents 10 first-person statements. The user rates each one on a
 1-5 scale (1 = strongly disagree, 3 = neutral, 5 = strongly agree). Each
-statement is mapped to a single career field with a weight; the rating
-offset from the neutral center (rating - 3) multiplied by the weight is
-added to that field's score. The field with the highest score is the
-primary recommendation.
+non-neutral answer is turned into a *fact* and fed to a miniature
+production-rule engine (`RuleEngine`) that fires scoring rules on an
+agenda. The field with the highest total score is the primary
+recommendation; the ordered list of fired-rule explanations is returned
+as `reasoning`.
+
+The engine is a deliberately small illustration of two classic
+expert-system ideas — see `RuleEngine`'s docstring:
+
+  * Smart Rule Matching   — the Rete algorithm's alpha network
+  * Tie-Breakers for Rules — conflict resolution (salience / specificity /
+                             recency) with refraction
 """
+
+from collections import defaultdict
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+
+
+# ---------------------------------------------------------------------------
+# Rule engine
+# ---------------------------------------------------------------------------
+#
+# A rule is a plain function `rule(engine, fact) -> activation | None`.
+# An *activation* is a dict describing a rule that is ready to fire:
+#
+#   {
+#     "name":        str,          # rule id (for refraction + the trace)
+#     "salience":    int,          # hand-set priority — higher fires first
+#     "specificity": int,          # how many conditions the rule tests
+#     "key":         hashable,     # identity for refraction (fire-once)
+#     "delta":       {field: int}, # score changes to apply when it fires
+#     "note":        str,          # human-readable line for `reasoning`
+#   }
+#
+# Each rule declares the fact type ("predicate") it reacts to via
+# RULES_BY_TRIGGER, so a new fact only wakes the handful of rules that
+# actually care about it.
+
+
+def rule_affinity(engine, fact):
+    """Generic: a single "I agree" answer nudges its field up.
+
+    Trigger: `affinity`. One condition, ordinary priority. The delta here is
+    exactly the old `(rating - 3) * weight`, so base scoring is unchanged.
+    """
+    _, field, strength, weight, sid = fact
+    delta = strength * weight
+    return {
+        "name": "strong-affinity",
+        "salience": 10,
+        "specificity": 1,
+        "key": ("strong-affinity", sid),
+        "delta": {field: delta},
+        "note": f"Leaned into {engine.field_name(field)} (Q{sid + 1}) → +{delta}",
+    }
+
+
+def rule_aversion(engine, fact):
+    """Generic: a single "I disagree" answer nudges its field down."""
+    _, field, strength, weight, sid = fact
+    delta = strength * weight
+    return {
+        "name": "strong-aversion",
+        "salience": 10,
+        "specificity": 1,
+        "key": ("strong-aversion", sid),
+        "delta": {field: -delta},
+        "note": f"Pushed back on {engine.field_name(field)} (Q{sid + 1}) → -{delta}",
+    }
+
+
+def rule_paired_affinity(engine, fact):
+    """Specific: BOTH statements for one field got an "agree".
+
+    Trigger: `affinity`. Two conditions, so it is more *specific* than
+    `rule_affinity`; it is also given a higher *salience* so it lands first
+    in the trace. (Even at equal salience the higher specificity would win
+    the tie.) Fires once per field via its `key`.
+    """
+    _, field, *_ = fact
+    hits = [f for f, _rec in engine.alpha["affinity"] if f[1] == field]
+    if len(hits) < 2:
+        return None
+    return {
+        "name": "paired-affinity",
+        "salience": 20,
+        "specificity": 2,
+        "key": ("paired-affinity", field),
+        "delta": {field: 2},
+        "note": f"Two answers both point at {engine.field_name(field)} → +2 bonus",
+    }
+
+
+def rule_paired_aversion(engine, fact):
+    """Specific: BOTH statements for one field got a "disagree" (symmetric)."""
+    _, field, *_ = fact
+    hits = [f for f, _rec in engine.alpha["aversion"] if f[1] == field]
+    if len(hits) < 2:
+        return None
+    return {
+        "name": "paired-aversion",
+        "salience": 20,
+        "specificity": 2,
+        "key": ("paired-aversion", field),
+        "delta": {field: -2},
+        "note": f"Two answers both reject {engine.field_name(field)} → -2",
+    }
+
+
+def rule_broad_enthusiasm(engine, fact):
+    """Generic catch-all: agreed with almost everything.
+
+    Trigger: `affinity`. Zero scored conditions and low salience, so it
+    always resolves *last* — the classic "generic rule loses to specific
+    ones". Adds no score, only a caveat to the trace.
+    """
+    if len(engine.alpha["affinity"]) < 5:
+        return None
+    return {
+        "name": "broad-enthusiasm",
+        "salience": 5,
+        "specificity": 0,
+        "key": ("broad-enthusiasm",),
+        "delta": {},
+        "note": "You reacted positively to most statements — the top match is less clear-cut.",
+    }
+
+
+RULES_BY_TRIGGER = {
+    "affinity": [rule_affinity, rule_paired_affinity, rule_broad_enthusiasm],
+    "aversion": [rule_aversion, rule_paired_aversion],
+}
+
+
+class RuleEngine:
+    """A miniature production-rule engine.
+
+    Two textbook expert-system ideas, in a deliberately small form:
+
+    1. Smart Rule Matching  (technically: the Rete algorithm's *alpha
+       network*).
+       In plain terms: instead of re-checking every rule against every known
+       fact whenever something changes, we keep a small index of facts
+       grouped by type (`self.alpha`) and only push a *newly asserted* fact
+       through the rules that react to that type (`RULES_BY_TRIGGER`). A fact
+       already in working memory is dropped on arrival, so nothing is matched
+       twice. The rulebook can grow without the match cost growing with it.
+
+    2. Tie-Breakers for Rules  (technically: *conflict-resolution
+       strategies* — salience, specificity, recency).
+       In plain terms: when several rules are ready at once we need an order.
+       A rule with a higher hand-set priority (**salience**) goes first;
+       ties go to the more detailed rule (**specificity** — more
+       conditions); remaining ties go to the rule triggered by the most
+       recently learned fact (**recency**). Every activation fires only once
+       (**refraction**).
+    """
+
+    def __init__(self, fields):
+        self._fields = fields
+        self.wm = set()                # working memory: facts seen (dedup)
+        self.alpha = defaultdict(list)  # alpha memory: predicate -> [(fact, recency)]
+        self.clock = 0                  # monotonic recency stamp
+        self.agenda = []               # pending activations
+        self.fired = set()             # activation keys already fired (refraction)
+        self.scores = {fid: 0 for fid in fields}
+        self.reasoning = []
+
+    def field_name(self, field_id):
+        return self._fields[field_id]["name"]
+
+    # -- Rete alpha step: assert one fact, match only what is new ----------
+    def assert_fact(self, fact):
+        if fact in self.wm:
+            return                      # already known -> nothing new to match
+        self.wm.add(fact)
+        self.clock += 1
+        predicate = fact[0]
+        self.alpha[predicate].append((fact, self.clock))
+        for rule in RULES_BY_TRIGGER.get(predicate, ()):
+            activation = rule(self, fact)
+            if activation and activation["key"] not in self.fired:
+                activation["recency"] = self.clock
+                self.agenda.append(activation)
+
+    def assert_rating(self, statement, rating):
+        """Translate a 1-5 answer into a fact (neutral 3 asserts nothing)."""
+        field, weight, sid = statement["field"], statement["weight"], statement["id"]
+        if rating >= 4:
+            self.assert_fact(("affinity", field, rating - 3, weight, sid))
+        elif rating <= 2:
+            self.assert_fact(("aversion", field, 3 - rating, weight, sid))
+
+    # -- Conflict resolution: order the agenda, then fire once each -------
+    def run(self):
+        self.agenda.sort(
+            key=lambda a: (-a["salience"], -a["specificity"], -a["recency"])
+        )
+        for activation in self.agenda:
+            if activation["key"] in self.fired:
+                continue
+            self.fired.add(activation["key"])
+            for field_id, delta in activation["delta"].items():
+                self.scores[field_id] += delta
+            self.reasoning.append(activation["note"])
+
+        if not self.reasoning:
+            self.reasoning.append(
+                "No strong preferences detected — answers were mostly neutral."
+            )
+        return self.scores, self.reasoning
 
 
 class ExpertSystem:
@@ -118,13 +323,11 @@ class ExpertSystem:
         ]
 
     def analyze(self, responses):
-        scores = {fid: 0 for fid in self.fields}
-
+        engine = RuleEngine(self.fields)
         for statement, response in zip(self.statements, responses):
-            if response is None:
-                continue
-            rating = int(response)
-            scores[statement["field"]] += (rating - 3) * statement["weight"]
+            if response is not None:
+                engine.assert_rating(statement, int(response))
+        scores, reasoning = engine.run()
 
         ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
 
@@ -147,6 +350,7 @@ class ExpertSystem:
             "confidence": confidence,
             "all_scores": scores,
             "recommendations": self.roadmaps[top_id],
+            "reasoning": reasoning,
         }
 
 

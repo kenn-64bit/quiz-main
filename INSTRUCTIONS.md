@@ -60,8 +60,9 @@ curl -X POST http://localhost:5000/api/analyze \
 ```
 
 In the browser: enter a name → answer all 10 statements on the 1–5 scale →
-results screen shows a recommendation, confidence, and a roadmap. Stop the
-backend and reload to confirm the inline "Connection Error".
+results screen shows a recommendation, confidence, a roadmap, and a short
+"How we got here" reasoning trace. Stop the backend and reload to confirm the
+inline "Connection Error".
 
 ### 1.4 Production build (frontend)
 
