@@ -124,7 +124,7 @@ export default function App() {
           <ResultsScreen result={result} onRestart={restart} />
         )}
 
-        <div style={styles.footerStrip}>› by yourstruly</div>
+        <div style={styles.footerStrip}>› by yourstruly nnek</div>
       </div>
 
       {screen === 'quiz' && showBackModal && (
