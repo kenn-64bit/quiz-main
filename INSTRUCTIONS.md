@@ -56,10 +56,10 @@ curl http://localhost:5000/api/health
 curl http://localhost:5000/api/quiz-questions
 curl -X POST http://localhost:5000/api/analyze \
   -H "Content-Type: application/json" \
-  -d '{"name":"Kenn","responses":[5,4,1,1,3,3,4,2,4,3]}'
+  -d '{"name":"Kenn","responses":[5,4,1,1,3,3,4,2,4,3,4,2,3,5,4,2]}'
 ```
 
-In the browser: enter a name → answer all 10 statements on the 1–5 scale →
+In the browser: enter a name → answer all 16 statements on the 1–5 scale →
 results screen shows a recommendation, confidence, a roadmap, and a short
 "How we got here" reasoning trace. Stop the backend and reload to confirm the
 inline "Connection Error".
@@ -119,7 +119,7 @@ vercel --prod
 | Frontend shows "Connection Error" | Backend not running, wrong proxy target in `vite.config.js`, or `VITE_API_BASE` wrong in the build |
 | `ModuleNotFoundError: flask` | Activate/point at the venv: `.venv/bin/python ...`, re-run `pip install -r requirements.txt` |
 | Port 5000 in use | `lsof -i :5000` then kill it, or change the port in `quiz_backend.py` **and** `vite.config.js` |
-| 400 from `/api/analyze` | `responses` must be exactly 10 items, each int `1`–`5` |
+| 400 from `/api/analyze` | `responses` must be exactly 16 items, each int `1`–`5` |
 | Blank page after deploy | Set the static host's output dir to `dist`; for a sub-path deploy set Vite `base` |
 
 ---

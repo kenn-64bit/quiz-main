@@ -1,12 +1,12 @@
 # Tech Stack Field Recommendation Quiz System
 
-A full-stack application with an expert system that analyzes 10 quiz questions to recommend the ideal tech career path for students and professionals.
+A full-stack application with an expert system that analyzes 16 quiz questions to recommend the ideal tech career path for students and professionals.
 
 ## 🎯 Features
 
-- **10-Statement Rating Quiz** - Each question is a statement rated on a 1-5 scale (1 = strongly disagree, 3 = neutral, 5 = strongly agree)
+- **16-Statement Rating Quiz** - Each question is a statement rated on a 1-5 scale (1 = strongly disagree, 3 = neutral, 5 = strongly agree)
 - **Expert System** - Rule-based inference engine that maps each statement to a career field and weights the rating offset from neutral to calculate field compatibility scores
-- **6 Career Paths** - Recommends from: Data Science, Web Development, DevOps, Mobile Development, Cybersecurity, and Game Development
+- **8 Career Paths** - Recommends from: Data Science, Web Development, DevOps, Mobile Development, Cybersecurity, Game Development, IoT & Embedded, and Networking
 - **Confidence Scoring** - Provides confidence level in recommendations based on response patterns
 - **Alternative Suggestions** - Shows top 3 matching fields with detailed descriptions
 - **Learning Roadmap** - Provides specific learning recommendations for the recommended field
@@ -111,7 +111,7 @@ Health check endpoint.
 ```
 
 ### GET /api/quiz-questions
-Retrieve all 10 quiz statements.
+Retrieve all 16 quiz statements.
 
 **Response:**
 ```json
@@ -129,13 +129,14 @@ Retrieve all 10 quiz statements.
 ### POST /api/analyze
 Analyze quiz responses and get a field recommendation.
 
-**Request:** `responses` is a list of 10 items, each an integer `1`–`5`
-(`3` = neutral). `name` is optional and echoed back in the response.
+**Request:** `responses` is a list of 16 items (one per statement — see
+`GET /api/quiz-questions`), each an integer `1`–`5` (`3` = neutral). `name` is
+optional and echoed back in the response.
 
 ```json
 {
   "name": "Kenn",
-  "responses": [5, 4, 1, 1, 3, 3, 4, 2, 4, 3]
+  "responses": [5, 4, 1, 1, 3, 3, 4, 2, 4, 3, 4, 2, 3, 5, 4, 2]
 }
 ```
 
@@ -210,18 +211,19 @@ Pipeline:
 
 ### Statements & Field Mapping
 
-| # | Field | Weight |
-|---|-------|--------|
-| 0 | Data Science & AI | 2 |
-| 1 | Data Science & AI | 1 |
-| 2 | Web Development | 2 |
-| 3 | Web Development | 1 |
-| 4 | DevOps & Infrastructure | 2 |
-| 5 | DevOps & Infrastructure | 1 |
-| 6 | Mobile Development | 2 |
-| 7 | Cybersecurity | 2 |
-| 8 | Game Development | 2 |
-| 9 | Game Development | 1 |
+Every field has **2 statements**, each with **weight 1**, so no field is
+favoured by the scoring:
+
+| # | Field |
+|---|-------|
+| 0, 1 | Data Science & AI |
+| 2, 3 | Web Development |
+| 4, 5 | DevOps & Infrastructure |
+| 6, 7 | Mobile Development |
+| 8, 9 | Cybersecurity |
+| 10, 11 | Game Development |
+| 12, 13 | IoT & Embedded |
+| 14, 15 | Networking |
 
 Statement text and mappings live in `ExpertSystem.statements` in `quiz_backend.py`.
 
@@ -241,18 +243,21 @@ self.fields = {
 }
 ```
 
-Then add at least one entry to `self.statements` that maps to the new field, and a
-matching list in `self.roadmaps`.
+Then add **2 entries** to `self.statements` mapping to the new field (keeping
+every field at the same statement count), and a matching list in `self.roadmaps`.
 
 ### Adjusting Scoring Weights
 
-Change a statement's `weight` in `self.statements` (1–2 recommended):
+All statements currently use `weight: 1` and every field has the same number of
+statements, so the quiz is balanced. Raising one statement's `weight` makes that
+field easier to score:
 
 ```python
-{"id": 0, "text": "...", "field": "data_science", "weight": 2},  # raise/lower weight
+{"id": 0, "text": "...", "field": "data_science", "weight": 2},  # this field now weighs more
 ```
 
-Higher weight = a given rating counts for more toward that field.
+If you change weights or statement counts, do it symmetrically across fields to
+keep results fair.
 
 ## 🎨 Customization
 
@@ -322,7 +327,7 @@ curl http://localhost:5000/api/quiz-questions
 # Test analysis
 curl -X POST http://localhost:5000/api/analyze \
   -H "Content-Type: application/json" \
-  -d '{"name": "Kenn", "responses": [5, 4, 1, 1, 3, 3, 4, 2, 4, 3]}'
+  -d '{"name": "Kenn", "responses": [5, 4, 1, 1, 3, 3, 4, 2, 4, 3, 4, 2, 3, 5, 4, 2]}'
 ```
 
 ### Test the Frontend
@@ -373,7 +378,7 @@ Set `VITE_API_BASE` to the deployed backend URL so `src/api.js` targets it.
 
 **Recommendations seem incorrect**
 - Verify ratings are sent as integers 1–5, not strings like `"3"`
-- Check `/api/quiz-questions` returns all 10 statements
+- Check `/api/quiz-questions` returns all 16 statements
 - Review statement-to-field mappings and weights in `self.statements`
 
 ## 📚 Resources

@@ -249,21 +249,35 @@ class ExpertSystem:
                 "name": "Game Development",
                 "description": "Design and build interactive games, engines, and real-time graphics.",
             },
+            "iot": {
+                "name": "IoT & Embedded",
+                "description": "Program microcontrollers and connected devices that sense and act on the physical world.",
+            },
+            "networking": {
+                "name": "Networking",
+                "description": "Design, run, and troubleshoot Data Centers and the networks that move data between systems.",
+            },
         }
 
-        # Each statement maps to exactly one field. Weight (1-2) reflects how
-        # strongly agreement signals that field. Every field is covered.
+        # Each statement maps to exactly one field. Every field has the same
+        # number of statements and every weight is 1, so no field is favoured.
         self.statements = [
-            {"id": 0, "text": "I enjoy finding patterns and trends hidden in large amounts of data.", "field": "data_science", "weight": 2},
-            {"id": 1, "text": "Working with statistics and mathematical models sounds exciting to me.", "field": "data_science", "weight": 1},
-            {"id": 2, "text": "I like seeing an interface come to life visually as I build it.", "field": "web_development", "weight": 2},
+            {"id": 0, "text": "I enjoy finding patterns and trends in data. Big Numbers === Stonks.", "field": "data_science", "weight": 1},
+            {"id": 1, "text": "Working with statistics and math models sounds like money.", "field": "data_science", "weight": 1},
+            {"id": 2, "text": "I like seeing an interface come to life visually as I build it brick by brick.", "field": "web_development", "weight": 1},
             {"id": 3, "text": "I care a lot about how a product looks and feels to the people using it.", "field": "web_development", "weight": 1},
-            {"id": 4, "text": "Automating repetitive tasks so they never have to be done by hand appeals to me.", "field": "devops", "weight": 2},
-            {"id": 5, "text": "I would enjoy making sure a system stays fast and online as it grows to millions of users.", "field": "devops", "weight": 1},
-            {"id": 6, "text": "Building an app that runs in someone's pocket and uses the camera or GPS excites me.", "field": "mobile_development", "weight": 2},
-            {"id": 7, "text": "I like thinking about how attackers break into systems and how to stop them.", "field": "cybersecurity", "weight": 2},
-            {"id": 8, "text": "I would enjoy building game worlds, physics, and real-time graphics.", "field": "game_development", "weight": 2},
-            {"id": 9, "text": "I want to build something creative and interactive that people play with for fun.", "field": "game_development", "weight": 1},
+            {"id": 4, "text": "I want to Automating repetitive tasks, think smarter not harder.", "field": "devops", "weight": 1},
+            {"id": 5, "text": "I would enjoy making sure a system stays fast and online as it grows to millions of users, CS MENTALITY!.", "field": "devops", "weight": 1},
+            {"id": 6, "text": "Building an app that lives in someone's pocket and taps the camera, GPS, and sensors excites me.", "field": "mobile_development", "weight": 1},
+            {"id": 7, "text": "Designing smooth touch interactions and offline-friendly apps for phones sounds great.", "field": "mobile_development", "weight": 1},
+            {"id": 8, "text": "I like thinking about how hackers break into systems and how to reverse engineer them.", "field": "cybersecurity", "weight": 1},
+            {"id": 9, "text": "Hardening systems, hunting for vulnerabilities, and responding to incidents appeals to me.", "field": "cybersecurity", "weight": 1},
+            {"id": 10, "text": "I would enjoy building game worlds, physics, and real-time graphics.", "field": "game_development", "weight": 1},
+            {"id": 11, "text": "I want to build something creative and interactive that people play with for fun.", "field": "game_development", "weight": 1},
+            {"id": 12, "text": "Repairing a Washing Machine sounds like a fun challenge.", "field": "iot", "weight": 1},
+            {"id": 13, "text": "I like microcontrollers and embedded systems.", "field": "iot", "weight": 1},
+            {"id": 14, "text": "I like how data travels across networks and how it gets to its destination.", "field": "networking", "weight": 1},
+            {"id": 15, "text": "I want my response times 0.200 seconds than 0.500 seconds.", "field": "networking", "weight": 1},
         ]
 
         self.roadmaps = {
@@ -308,6 +322,20 @@ class ExpertSystem:
                 "Practice math for games: vectors, matrices, and trigonometry.",
                 "Build and finish small games to learn scope management.",
                 "Share your games and gather player feedback.",
+            ],
+            "iot": [
+                "Learn C/C++ and Python for microcontrollers.",
+                "Get hands-on with an Arduino or ESP32 and basic electronics (GPIO, I2C, SPI).",
+                "Read sensors and drive actuators, then log the data.",
+                "Connect devices to the cloud with MQTT and understand power and memory constraints.",
+                "Build an end-to-end project: device, gateway, dashboard.",
+            ],
+            "networking": [
+                "Learn the OSI/TCP-IP models and how IP, TCP, UDP, and DNS work.",
+                "Practice subnetting, routing, switching, and VLANs (labs in Packet Tracer or GNS3).",
+                "Get comfortable with Wireshark, ping/traceroute, and other diagnostic tools.",
+                "Study firewalls, NAT, VPNs, and basic network security.",
+                "Work toward a certification such as CompTIA Network+ or CCNA.",
             ],
         }
 
