@@ -16,13 +16,46 @@ expert-system ideas — see `RuleEngine`'s docstring:
                              recency) with refraction
 """
 
-from collections import defaultdict
+import time
+from collections import defaultdict, deque
+from threading import Lock
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+
+# --- Simple per-IP sliding-window rate limiting -----------------------------
+# Best-effort: state is per-process, so on a serverless/multi-worker host it
+# only throttles bursts that land on the same instance. Enough to blunt a
+# client hammering refresh or buttons.
+RATE_LIMIT_MAX = 30            # requests ...
+RATE_LIMIT_WINDOW = 10.0      # ... per this many seconds, per IP
+_rate_hits = defaultdict(deque)
+_rate_lock = Lock()
+
+
+@app.before_request
+def _rate_limit():
+    if request.method == "OPTIONS":
+        return None
+    ip = (request.headers.get("x-forwarded-for", request.remote_addr or "?")
+          .split(",")[0].strip())
+    now = time.monotonic()
+    with _rate_lock:
+        hits = _rate_hits[ip]
+        while hits and now - hits[0] > RATE_LIMIT_WINDOW:
+            hits.popleft()
+        if len(hits) >= RATE_LIMIT_MAX:
+            retry = round(RATE_LIMIT_WINDOW - (now - hits[0]), 1)
+            resp = jsonify({"error": "Too many requests — slow down.",
+                            "retry_after": retry})
+            resp.status_code = 429
+            resp.headers["Retry-After"] = str(int(retry) + 1)
+            return resp
+        hits.append(now)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -267,12 +300,12 @@ class ExpertSystem:
             {"id": 2, "text": "I like seeing an interface come to life visually as I build it brick by brick.", "field": "web_development", "weight": 1},
             {"id": 3, "text": "I care a lot about how a product looks and feels to the people using it.", "field": "web_development", "weight": 1},
             {"id": 4, "text": "I want to Automating repetitive tasks, think smarter not harder.", "field": "devops", "weight": 1},
-            {"id": 5, "text": "I would enjoy making sure a system stays fast and online as it grows to millions of users, CS MENTALITY!.", "field": "devops", "weight": 1},
+            {"id": 5, "text": "I enjoy making sure a system stays fast and online as it grows to millions of users, CS MENTALITY!.", "field": "devops", "weight": 1},
             {"id": 6, "text": "Building an app that lives in someone's pocket and taps the camera, GPS, and sensors excites me.", "field": "mobile_development", "weight": 1},
             {"id": 7, "text": "Designing smooth touch interactions and offline-friendly apps for phones sounds great.", "field": "mobile_development", "weight": 1},
             {"id": 8, "text": "I like thinking about how hackers break into systems and how to reverse engineer them.", "field": "cybersecurity", "weight": 1},
             {"id": 9, "text": "Hardening systems, hunting for vulnerabilities, and responding to incidents appeals to me.", "field": "cybersecurity", "weight": 1},
-            {"id": 10, "text": "I would enjoy building game worlds, physics, and real-time graphics.", "field": "game_development", "weight": 1},
+            {"id": 10, "text": "I enjoy building game worlds, physics, and real-time graphics.", "field": "game_development", "weight": 1},
             {"id": 11, "text": "I want to build something creative and interactive that people play with for fun.", "field": "game_development", "weight": 1},
             {"id": 12, "text": "Repairing a Washing Machine sounds like a fun challenge.", "field": "iot", "weight": 1},
             {"id": 13, "text": "I like microcontrollers and embedded systems.", "field": "iot", "weight": 1},

@@ -26,7 +26,7 @@ export default function App() {
         setQuestions(qs)
         setResponses(new Array(qs.length).fill(null))
       })
-      .catch(() => setError(CONNECTION_ERROR))
+      .catch((e) => setError(e?.message?.includes('Too many') ? e.message : CONNECTION_ERROR))
       .finally(() => setLoading(false))
   }, [])
 
@@ -59,8 +59,8 @@ export default function App() {
       const data = await analyze(name.trim(), responses)
       setResult(data)
       setScreen('results')
-    } catch {
-      setError(CONNECTION_ERROR)
+    } catch (e) {
+      setError(e?.message?.includes('Too many') ? e.message : CONNECTION_ERROR)
     } finally {
       setSubmitting(false)
     }
