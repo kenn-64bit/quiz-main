@@ -14,6 +14,17 @@ expert-system ideas — see `RuleEngine`'s docstring:
   * Smart Rule Matching   — the Rete algorithm's alpha network
   * Tie-Breakers for Rules — conflict resolution (salience / specificity /
                              recency) with refraction
+
+Deployment: this file lives at `api/index.py`, one of Vercel's default
+Python/Flask entrypoint locations, so Vercel's runtime auto-detects the
+module-level `app` (a WSGI callable) and mounts it for `/api/*`. It is the
+ONLY module in the repo that defines a Flask `app`. Do NOT add an `/api/*`
+`rewrites` rule to `vercel.json` — Vercel routes internal rewrites by their
+rewritten destination path, which would hand Flask the wrong URL. `vercel.json`
+only configures the frontend build; the static site is served from
+`frontend/dist` and this function handles `/api/*`.
+
+Run locally: `python api/index.py` (serves http://localhost:5000, debug=True).
 """
 
 import time
