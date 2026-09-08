@@ -1,8 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/[...path].py": { "includeFiles": "quiz_backend.py" }
-  }
+  "outputDirectory": "frontend/dist"
 }

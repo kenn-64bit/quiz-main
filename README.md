@@ -30,8 +30,10 @@ A full-stack application with an expert system that analyzes 16 quiz questions t
 
 ```
 quiz/
-├── quiz_backend.py          # Flask backend with expert system
+├── api/
+│   └── index.py             # Flask backend with expert system (+ Vercel entrypoint)
 ├── requirements.txt         # Python dependencies
+├── vercel.json              # Vercel build config (frontend build + static output)
 ├── README.md                # This file
 └── frontend/                # Vite + React app
     ├── index.html
@@ -59,7 +61,7 @@ pip install -r requirements.txt
 
 2. **Run the Backend Server**
 ```bash
-python quiz_backend.py
+python api/index.py
 ```
 
 You should see:
@@ -183,7 +185,7 @@ optional and echoed back in the response.
 ## 🧠 Expert System Logic
 
 Non-neutral answers are turned into **facts** and fed to a miniature
-production-rule engine (`RuleEngine` in `quiz_backend.py`) that illustrates two
+production-rule engine (`RuleEngine` in `api/index.py`) that illustrates two
 classic expert-system ideas:
 
 1. **Smart Rule Matching** (the Rete algorithm's *alpha network*) - facts are
@@ -225,13 +227,13 @@ favoured by the scoring:
 | 12, 13 | IoT & Embedded |
 | 14, 15 | Networking |
 
-Statement text and mappings live in `ExpertSystem.statements` in `quiz_backend.py`.
+Statement text and mappings live in `ExpertSystem.statements` in `api/index.py`.
 
 ## 🔧 Configuration
 
 ### Adding New Fields
 
-Edit `quiz_backend.py` in the `ExpertSystem.__init__()` method:
+Edit `api/index.py` in the `ExpertSystem.__init__()` method:
 
 ```python
 self.fields = {
@@ -286,7 +288,7 @@ The shared window chrome (titlebar, sub-caption, footer strip) lives in
 
 ### Quiz Statements
 
-Edit the statement text and field mapping in `quiz_backend.py`:
+Edit the statement text and field mapping in `api/index.py`:
 
 ```python
 # In ExpertSystem.__init__
@@ -342,7 +344,7 @@ curl -X POST http://localhost:5000/api/analyze \
 ### Vercel (frontend + API in one project) — recommended
 
 The repo ships a `vercel.json`: the React app is built as a static site and
-`quiz_backend.py` runs as a Python serverless function at `/api/*` on the same
+`api/index.py` runs as a Python serverless function at `/api/*` on the same
 domain, so there is **no CORS setup and no `VITE_API_BASE` to configure**.
 
 ```bash
@@ -353,18 +355,22 @@ vercel --prod
 
 Or import the Git repo on vercel.com and leave all build settings on default.
 
-- `vercel.json` — static build of `frontend/` + `@vercel/python` on
-  `api/[...path].py`; `/api/*` → the function, everything else → the static build.
-- `api/[...path].py` — re-exports the Flask `app` from `quiz_backend.py`.
-- `requirements.txt` — installed for the function automatically.
+- `vercel.json` — only `buildCommand` + `outputDirectory` (`frontend/dist`), no
+  `routes`/`rewrites`. Vercel serves the static build from its CDN and routes
+  `/api/*` to the Python function. Do **not** add an `/api/*` rewrite (Vercel
+  routes internal rewrites by their rewritten destination path → breaks Flask).
+- `api/index.py` — the Flask `app`; the only `app` in the repo and at a
+  canonical Vercel Python entrypoint location, so it is auto-detected (no
+  `functions`/`includeFiles` needed).
+- `requirements.txt` (repo root) — installed for the function automatically.
 
 ### Split hosting (backend elsewhere)
 
 Backend on any WSGI host (Render, Railway, Fly, Heroku):
 
 ```bash
-echo "web: gunicorn quiz_backend:app" > Procfile   # Heroku
-# or start command: gunicorn quiz_backend:app --bind 0.0.0.0:$PORT
+echo "web: gunicorn --chdir api index:app" > Procfile   # Heroku
+# or start command: gunicorn --chdir api index:app --bind 0.0.0.0:$PORT
 ```
 
 Frontend on any static host — build `frontend/` with
@@ -376,7 +382,7 @@ See `INSTRUCTIONS.md` §1.5–1.7 for step-by-step commands.
 ## 🐛 Troubleshooting
 
 **Frontend shows "Connection Error"**
-- Ensure backend is running: `python quiz_backend.py`
+- Ensure backend is running: `python api/index.py`
 - Check CORS is enabled (Flask-CORS installed)
 - In dev, confirm the Vite proxy target in `frontend/vite.config.js` matches the backend port
 - In a build, confirm `VITE_API_BASE` points at the deployed backend

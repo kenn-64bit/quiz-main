@@ -9,9 +9,9 @@ Two parts:
 
 ## Part 1 — This project (Tech Stack Quiz)
 
-Architecture: a Python **Flask** API (`quiz_backend.py`) on port `5000`, and a
+Architecture: a Python **Flask** API (`api/index.py`) on port `5000`, and a
 **Vite + React** frontend (`frontend/`) on port `5173` that calls the API through
-a dev proxy.
+a dev proxy. `api/index.py` doubles as the Vercel serverless entrypoint.
 
 ### 1.1 Prerequisites
 
@@ -28,7 +28,7 @@ Open **two terminals**.
 cd "/home/kenn/Documents/Cloned Projects/quiz"
 python3 -m venv .venv            # first time only
 .venv/bin/pip install -r requirements.txt   # first time / when requirements change
-.venv/bin/python quiz_backend.py
+.venv/bin/python api/index.py
 ```
 
 Expected output:
@@ -78,7 +78,7 @@ npm run preview                                          # serve the build local
 ### 1.5 Deploy to Vercel (frontend + API, one project)
 
 The repo has a `vercel.json` that builds the React app as a static site **and**
-runs `quiz_backend.py` as a Python serverless function at `/api/*` — same
+runs `api/index.py` as a Python serverless function at `/api/*` — same
 domain, so no CORS and no `VITE_API_BASE` needed.
 
 ```bash
@@ -91,12 +91,15 @@ vercel --prod
 Or import the Git repo at vercel.com → **New Project**; leave every build
 setting on default (`vercel.json` supplies them). Pieces involved:
 
-- `vercel.json` — `@vercel/static-build` on `frontend/package.json` (output
-  `frontend/dist`) + `@vercel/python` on `api/[...path].py` (a catch-all function); `/api/*`
-  to the function and everything else to the static build.
-- `api/[...path].py` — imports the Flask `app` from `quiz_backend.py` (bundled via
-  `includeFiles`).
-- `requirements.txt` — installed for the function automatically.
+- `vercel.json` — only `buildCommand` (`cd frontend && npm install && npm run
+  build`) and `outputDirectory` (`frontend/dist`). No `routes`/`rewrites`:
+  Vercel serves `frontend/dist` from its static CDN and routes `/api/*` to the
+  Python function. **Never** add an `/api/*` rewrite — Vercel routes internal
+  rewrites by their rewritten destination path, which breaks Flask routing.
+- `api/index.py` — the Flask `app`. It sits at a canonical Vercel Python
+  entrypoint location and is the only module in the repo defining an `app`, so
+  Vercel auto-detects and mounts it; no `functions`/`includeFiles` config needed.
+- `requirements.txt` (repo root) — installed for the function automatically.
 
 Deploying elsewhere? Use the split setup below (1.6–1.7).
 
@@ -106,14 +109,14 @@ Any host that runs a WSGI app works. Use **gunicorn** (already in
 `requirements.txt`):
 
 ```bash
-gunicorn quiz_backend:app --bind 0.0.0.0:$PORT
+gunicorn --chdir api index:app --bind 0.0.0.0:$PORT
 ```
 
 - **Render / Railway / Fly.io:** new Web Service from the repo, build command
   `pip install -r requirements.txt`, start command
-  `gunicorn quiz_backend:app --bind 0.0.0.0:$PORT`.
-- **Heroku:** add a `Procfile` containing `web: gunicorn quiz_backend:app`, then
-  `git push heroku main`.
+  `gunicorn --chdir api index:app --bind 0.0.0.0:$PORT`.
+- **Heroku:** add a `Procfile` containing `web: gunicorn --chdir api index:app`,
+  then `git push heroku main`.
 - **Plain VM:** run the gunicorn command under `systemd` and put nginx in front.
 
 CORS is already enabled app-wide (`flask_cors.CORS(app)`), so a separately-hosted
@@ -134,7 +137,7 @@ Static host (Netlify, Cloudflare Pages, GitHub Pages, S3+CloudFront):
 |---|---|
 | Frontend shows "Connection Error" | Backend not running, wrong proxy target in `vite.config.js`, or `VITE_API_BASE` wrong in the build |
 | `ModuleNotFoundError: flask` | Activate/point at the venv: `.venv/bin/python ...`, re-run `pip install -r requirements.txt` |
-| Port 5000 in use | `lsof -i :5000` then kill it, or change the port in `quiz_backend.py` **and** `vite.config.js` |
+| Port 5000 in use | `lsof -i :5000` then kill it, or change the port in `api/index.py` **and** `vite.config.js` |
 | 400 from `/api/analyze` | `responses` must be exactly 16 items, each int `1`–`5` |
 | Blank page after deploy | Set the static host's output dir to `dist`; for a sub-path deploy set Vite `base` |
 
